@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Worker Table</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input { border: none; background: transparent; font-size: 14px; width: 100%; text-align: center; font-weight: 600; }
+        input[type="time"], input[type="date"] { -webkit-appearance: none; min-height: 35px; }
+        th { font-size: 10px; text-transform: uppercase; color: #64748b; padding: 10px 5px; }
+        td { border-bottom: 1px solid #f1f5f9; padding: 8px 2px; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans">
+    <div class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl">
+        
+        <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+            <h1 class="font-black text-xl tracking-tighter">WORKER LOG</h1>
+            <div class="flex gap-4">
+                <div class="text-center">
+                    <span class="text-[9px] block opacity-50">НОРМА €</span>
+                    <input type="number" id="r_n" value="10" class="text-white !text-lg w-12" oninput="calc()">
+                </div>
+                <div class="text-center">
+                    <span class="text-[9px] block opacity-50">СВЕРХ €</span>
+                    <input type="number" id="r_o" value="15" class="text-white !text-lg w-12" oninput="calc()">
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr class="bg-slate-50">
+                        <th class="w-1/4">Дата</th>
+                        <th>Начало</th>
+                        <th>Конец</th>
+                        <th>Обед</th>
+                        <th class="text-right pr-4">Итого</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="p-6">
+            <button onclick="addRow()" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold active:scale-95 transition-transform shadow-lg">
+                + ДОБАВИТЬ СТРОКУ
+            </button>
+        </div>
+
+        <div class="fixed bottom-0 left-0 right-0 max-w-xl mx-auto bg-white border-t p-6 flex justify-between items-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+            <div>
+                <span class="text-xs text-slate-400 block font-bold">ОБЩЕЕ ВРЕМЯ</span>
+                <span id="h" class="text-xl font-black text-slate-800">0.00 ч.</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-slate-400 block font-bold">ИТОГО К ОПЛАТЕ</span>
+                <span id="m" class="text-3xl font-black text-blue-600 tracking-tighter text-nowrap">0.00 €</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function addRow() {
+            const tbody = document.getElementById('table-body');
+            const row = document.createElement('tr');
+            const today = new Date().toISOString().split('T')[0];
+            
+            row.innerHTML = `
+                <td><input type="date" value="${today}" oninput="calc()"></td>
+                <td><input type="time" value="07:00" oninput="calc()"></td>
+                <td><input type="time" value="16:00" oninput="calc()"></td>
+                <td><input type="number" value="0" class="!w-10" oninput="calc()"></td>
+                <td class="text-right pr-4 font-bold text-slate-700" id="row-total">0.00</td>
+            `;
+            tbody.appendChild(row);
+            calc();
+        }
+
+        function calc() {
+            let totalH = 0, totalM = 0;
+            const rn = parseFloat(document.getElementById('r_n').value) || 0;
+            const ro = parseFloat(document.getElementById('r_o').value) || 0;
+            
+            document.querySelectorAll('#table-body tr').forEach(tr => {
+                const inputs = tr.querySelectorAll('input');
+                const start = inputs[1].value;
+                const end = inputs[2].value;
+                const lunch = parseFloat(inputs[3].value) || 0;
+                const display = tr.querySelector('#row-total');
+
+                if(start && end) {
+                    let diff = (new Date('2000-01-01T'+end) - new Date('2000-01-01T'+start))/3600000;
+                    if(diff < 0) diff += 24;
+                    let net = Math.max(0, diff - lunch/60);
+                    
+                    display.innerText = net.toFixed(2);
+                    totalH += net;
+                    totalM += net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
+                }
+            });
+            document.getElementById('h').innerText = totalH.toFixed(2) + ' ч.';
+            document.getElementById('m').innerText = totalM.toFixed(2).replace('.', ',') + ' €';
+        }
+        addRow();
+    </script>
+</body>
+</html>
