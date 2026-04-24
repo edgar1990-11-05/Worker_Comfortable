@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Worker App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Делаем поля ввода похожими на iOS */
+        input[type="time"], input[type="date"], input[type="number"] {
+            -webkit-appearance: none;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 12px;
+            padding: 10px;
+            font-weight: 600;
+        }
+        .ios-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        }
+    </style>
+</head>
+<body class="bg-[#f2f2f7] min-h-screen p-4 font-sans text-slate-900">
+    <div class="max-w-md mx-auto space-y-6">
+        
+        <header class="flex justify-between items-center py-2">
+            <h1 class="text-3xl font-extrabold tracking-tight">Моя Работа</h1>
+            <div class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase">Pro</div>
+        </header>
+
+        <div class="ios-card p-5 grid grid-cols-2 gap-6">
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Ставка €/ч</label>
+                <input type="number" id="r_n" value="10" class="w-full mt-1 text-lg" oninput="calc()">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Сверх €/ч</label>
+                <input type="number" id="r_o" value="15" class="w-full mt-1 text-lg" oninput="calc()">
+            </div>
+        </div>
+
+        <div id="list" class="space-y-4">
+            </div>
+
+        <button onclick="add()" class="w-full bg-white text-blue-600 py-4 rounded-2xl font-bold shadow-sm active:bg-slate-100 transition-colors">
+            + Добавить рабочий день
+        </button>
+
+        <div class="ios-card bg-slate-900 p-6 text-white sticky bottom-6 shadow-2xl shadow-blue-200">
+            <div class="flex justify-between items-center opacity-60 mb-2">
+                <span class="text-sm">Итого за период:</span>
+                <span id="h" class="font-medium text-base">0.00 ч.</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-lg font-bold">К ВЫПЛАТЕ</span>
+                <span id="m" class="text-3xl font-black text-yellow-400 tracking-tighter">0.00 €</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let dayCount = 0;
+        function add() {
+            dayCount++;
+            const list = document.getElementById('list');
+            const div = document.createElement('div');
+            const today = new Date().toISOString().split('T')[0];
+            
+            div.className = "ios-card p-5 animate-in fade-in slide-in-from-bottom-2 duration-300";
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <input type="date" value="${today}" class="text-sm" oninput="calc()">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">Обед (мин)</span>
+                        <input type="number" value="0" class="w-16 text-center" oninput="calc()">
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex-1">
+                        <label class="text-[9px] font-bold text-slate-400 uppercase block mb-1 ml-1 text-center">Начало</label>
+                        <input type="time" value="07:00" class="w-full text-center text-lg" oninput="calc()">
+                    </div>
+                    <div class="text-slate-300 font-light">→</div>
+                    <div class="flex-1">
+                        <label class="text-[9px] font-bold text-slate-400 uppercase block mb-1 ml-1 text-center">Конец</label>
+                        <input type="time" value="16:00" class="w-full text-center text-lg" oninput="calc()">
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+            calc();
+        }
+
+        function calc() {
+            let th = 0, tm = 0;
+            const rn = parseFloat(document.getElementById('r_n').value) || 0;
+            const ro = parseFloat(document.getElementById('r_o').value) || 0;
+            
+            document.querySelectorAll('#list > .ios-card').forEach(d => {
+                const inputs = d.querySelectorAll('input');
+                const lunch = parseFloat(inputs[1].value) || 0;
+                const start = inputs[2].value;
+                const end = inputs[3].value;
+
+                if(start && end) {
+                    let diff = (new Date('2000-01-01T'+end) - new Date('2000-01-01T'+start))/3600000;
+                    if(diff < 0) diff += 24;
+                    let net = Math.max(0, diff - lunch/60);
+                    th += net;
+                    tm += net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
+                }
+            });
+            document.getElementById('h').innerText = th.toFixed(2) + ' ч.';
+            document.getElementById('m').innerText = tm.toFixed(2).replace('.', ',') + ' €';
+        }
+        add();
+    </script>
+</body>
+</html>
