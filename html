@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Worker App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 font-sans text-gray-900">
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-lg p-6">
+        <h1 class="text-2xl font-black text-blue-600 mb-6 text-center">WORKER APP</h1>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase">Ставка €/ч</label>
+                <input type="number" id="r_n" value="10" class="w-full bg-gray-50 border-none rounded-2xl p-4 text-xl font-bold focus:ring-2 focus:ring-blue-500" oninput="calc()">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase">Сверх €/ч</label>
+                <input type="number" id="r_o" value="15" class="w-full bg-gray-50 border-none rounded-2xl p-4 text-xl font-bold focus:ring-2 focus:ring-blue-500" oninput="calc()">
+            </div>
+        </div>
+
+        <div id="list" class="space-y-3 mb-6"></div>
+
+        <button onclick="add()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg active:scale-95 transition-transform shadow-lg shadow-blue-200 mb-6">
+            + ДОБАВИТЬ ДЕНЬ
+        </button>
+
+        <div class="bg-blue-600 rounded-3xl p-6 text-white shadow-xl shadow-blue-100">
+            <div class="flex justify-between items-center opacity-80 mb-1">
+                <span>Всего часов:</span>
+                <span id="h" class="font-bold">0.00</span>
+            </div>
+            <div class="flex justify-between items-end">
+                <span class="text-lg font-bold">ИТОГО К ОПЛАТЕ:</span>
+                <span id="m" class="text-3xl font-black text-yellow-300 tracking-tight">0.00 €</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let count = 0;
+        function add() {
+            count++;
+            const div = document.createElement('div');
+            div.className = "bg-gray-50 p-4 rounded-2xl border border-gray-100";
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <span class="font-black text-gray-400 text-sm italic">ДЕНЬ ${count}</span>
+                    <input type="number" placeholder="Обед (мин)" class="w-24 bg-white border rounded-xl p-2 text-center text-sm" oninput="calc()">
+                </div>
+                <div class="flex gap-3">
+                    <input type="time" value="07:00" class="flex-1 bg-white border-none rounded-xl p-3 font-bold text-center" oninput="calc()">
+                    <input type="time" value="16:00" class="flex-1 bg-white border-none rounded-xl p-3 font-bold text-center" oninput="calc()">
+                </div>`;
+            document.getElementById('list').appendChild(div);
+            calc();
+        }
+        function calc() {
+            let th = 0, tm = 0;
+            const rn = parseFloat(document.getElementById('r_n').value) || 0;
+            const ro = parseFloat(document.getElementById('r_o').value) || 0;
+            document.querySelectorAll('#list > div').forEach(d => {
+                const i = d.querySelectorAll('input');
+                const b = parseFloat(i[0].value) || 0;
+                const s = i[1].value, e = i[2].value;
+                if(s && e) {
+                    let diff = (new Date('2000T'+e) - new Date('2000T'+s))/3600000;
+                    if(diff < 0) diff += 24;
+                    let net = Math.max(0, diff - b/60);
+                    th += net;
+                    tm += net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
+                }
+            });
+            document.getElementById('h').innerText = th.toFixed(2);
+            document.getElementById('m').innerText = tm.toFixed(2) + ' €';
+        }
+        add();
+    </script>
+</body>
+</html>
