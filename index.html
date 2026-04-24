@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Worker Comfortable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f2f2f7; -webkit-user-select: none; }
+        .ios-table { width: 100%; border-collapse: separate; border-spacing: 0; background: white; border-radius: 14px; overflow: hidden; }
+        th { background: #f8fafc; font-size: 10px; text-transform: uppercase; color: #64748b; padding: 12px 4px; border-bottom: 1px solid #e5e7eb; }
+        td { padding: 8px 2px; border-bottom: 1px solid #f2f2f7; text-align: center; }
+        input[type="time"] { 
+            background: #f1f5f9; border-radius: 8px; padding: 8px 2px; 
+            font-weight: 800; color: #1e293b; border: none; font-size: 14px;
+            -webkit-appearance: none; width: 80px; text-align: center;
+        }
+        input[type="number"] { background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-weight: 700; }
+        tr.weekend { background-color: #fff5f5; }
+        tr.weekend td:first-child { color: #ef4444; }
+        .sticky-footer { position: sticky; bottom: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-top: 1px solid #e5e7eb; padding: 15px 20px 30px; }
+    </style>
+</head>
+<body class="font-sans antialiased text-slate-900">
+
+    <div class="max-w-xl mx-auto min-h-screen flex flex-col">
+        
+        <header class="p-6 pb-2">
+            <h1 class="text-3xl font-black tracking-tight text-slate-800" id="month-title">ГРАФИК</h1>
+            <div class="flex gap-4 mt-4 bg-white p-4 rounded-2xl shadow-sm border">
+                <div class="flex-1"><label class="text-[10px] font-bold text-slate-400 block uppercase">Норма €</label><input type="number" id="r_n" value="10" class="w-full text-xl font-bold text-blue-600 outline-none" oninput="calc()"></div>
+                <div class="flex-1 border-l pl-4"><label class="text-[10px] font-bold text-slate-400 block uppercase">Сверх €</label><input type="number" id="r_o" value="15" class="w-full text-xl font-bold text-orange-600 outline-none" oninput="calc()"></div>
+            </div>
+        </header>
+
+        <div class="p-2 flex-1">
+            <table class="ios-table shadow-sm">
+                <thead>
+                    <tr>
+                        <th class="w-12">День</th>
+                        <th>Начало</th>
+                        <th>Конец</th>
+                        <th class="w-12">Обед</th>
+                        <th>€</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+
+        <div class="sticky-footer">
+            <div class="flex justify-between items-end mb-1 text-slate-500 font-bold text-[10px] uppercase tracking-widest">
+                <span>Часы: <span id="total_h" class="text-slate-800">0</span></span>
+                <span>К выплате</span>
+            </div>
+            <div id="total_m" class="text-5xl font-black text-blue-600 tracking-tighter text-right leading-none">0.00 €</div>
+        </div>
+    </div>
+
+    <script>
+        const weekdays = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+        const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+        window.onload = function() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            document.getElementById('month-title').innerText = months[month].toUpperCase();
+
+            const saved = JSON.parse(localStorage.getItem('worker_log_v2') || '{}');
+            document.getElementById('r_n').value = saved.r_n || 10;
+            document.getElementById('r_o').value = saved.r_o || 15;
+
+            const tbody = document.getElementById('table-body');
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(year, month, d);
+                const dayName = weekdays[date.getDay()];
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const rowData = saved.rows ? saved.rows[d-1] : null;
+
+                const tr = document.createElement('tr');
+                if (isWeekend) tr.className = 'weekend';
+                
+                tr.innerHTML = `
+                    <td class="font-bold text-xs">${d}<br><span class="opacity-40 font-normal">${dayName}</span></td>
+                    <td><input type="time" step="1800" value="${rowData ? rowData.s : ''}" oninput="calc()"></td>
+                    <td><input type="time" step="1800" value="${rowData ? rowData.e : ''}" oninput="calc()"></td>
+                    <td><input type="number" value="${rowData ? rowData.l : 0}" class="w-10 text-center text-sm py-1" oninput="calc()"></td>
+                    <td id="row-m" class="font-black text-slate-300 text-xs tracking-tighter">0</td>
+                `;
+                tbody.appendChild(tr);
+            }
+            calc();
+        };
+
+        function calc() {
+            let tH = 0, tM = 0;
+            const rn = parseFloat(document.getElementById('r_n').value) || 0;
+            const ro = parseFloat(document.getElementById('r_o').value) || 0;
+            const rows = [];
+
+            document.querySelectorAll('#table-body tr').forEach(tr => {
+                const i = tr.querySelectorAll('input');
+                const s = i[0].value, e = i[1].value, l = parseFloat(i[2].value) || 0;
+                rows.push({s, e, l});
+
+                const rowM = tr.querySelector('#row-m');
+
+                if (s && e) {
+                    const [sh, sm] = s.split(':').map(Number);
+                    const [eh, em] = e.split(':').map(Number);
+                    
+                    let diff = (eh + em/60) - (sh + sm/60);
+                    if (diff < 0) diff += 24;
+                    
+                    let net = Math.max(0, diff - l/60);
+                    let m = net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
+                    
+                    rowM.innerText = Math.round(m);
+                    rowM.className = "font-black text-blue-600 text-sm";
+                    tH += net; 
+                    tM += m;
+                } else {
+                    rowM.innerText = "0";
+                    rowM.className = "font-black text-slate-200 text-xs";
+                }
+            });
+
+            document.getElementById('total_h').innerText = tH.toFixed(1);
+            document.getElementById('total_m').innerText = tM.toFixed(2).replace('.', ',') + ' €';
+            localStorage.setItem('worker_log_v2', JSON.stringify({r_n: rn, r_o: ro, rows}));
+        }
+    </script>
+</body>
+</html>
