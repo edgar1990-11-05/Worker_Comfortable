@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Worker Comfortable</title>
+    <title>Worker Comfortable LT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #f2f2f7; -webkit-user-select: none; }
@@ -11,7 +11,6 @@
         th { background: #f8fafc; font-size: 10px; text-transform: uppercase; color: #64748b; padding: 12px 4px; border-bottom: 1px solid #e5e7eb; }
         td { padding: 8px 2px; border-bottom: 1px solid #f2f2f7; text-align: center; }
         
-        /* Стили для новых выпадающих списков */
         .time-select { 
             background: #f1f5f9; border-radius: 8px; padding: 8px 2px; 
             font-weight: 800; color: #1e293b; border: none; font-size: 14px;
@@ -20,17 +19,28 @@
         }
 
         input[type="number"] { background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-weight: 700; }
-        tr.weekend { background-color: #fff5f5; }
-        tr.weekend td:first-child { color: #ef4444; }
+        
+        /* Подсветка выходных и праздников */
+        tr.holiday { background-color: #fff5f5; }
+        tr.holiday td:first-child { color: #ef4444; }
+
         .sticky-footer { position: sticky; bottom: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-top: 1px solid #e5e7eb; padding: 15px 20px 30px; }
+        #month-picker { position: absolute; opacity: 0; pointer-events: none; width: 0; }
+        .header-clickable { cursor: pointer; display: flex; align-items: center; gap: 8px; }
     </style>
 </head>
 <body class="font-sans antialiased text-slate-900">
 
     <div class="max-w-xl mx-auto min-h-screen flex flex-col">
-
         <header class="p-6 pb-2">
-            <h1 class="text-3xl font-black tracking-tight text-slate-800" id="month-title">ГРАФИК</h1>
+            <div class="header-clickable" onclick="document.getElementById('month-picker').showPicker()">
+                <h1 class="text-3xl font-black tracking-tight text-slate-800" id="month-title">ГРАФИК</h1>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <input type="month" id="month-picker" onchange="changeDate(this.value)">
+            </div>
+            
             <div class="flex gap-4 mt-4 bg-white p-4 rounded-2xl shadow-sm border">
                 <div class="flex-1"><label class="text-[10px] font-bold text-slate-400 block uppercase">Норма €</label><input type="number" id="r_n" value="10" class="w-full text-xl font-bold text-blue-600 outline-none" oninput="calc()"></div>
                 <div class="flex-1 border-l pl-4"><label class="text-[10px] font-bold text-slate-400 block uppercase">Сверх €</label><input type="number" id="r_o" value="15" class="w-full text-xl font-bold text-orange-600 outline-none" oninput="calc()"></div>
@@ -64,8 +74,61 @@
     <script>
         const weekdays = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
         const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+        
+        // Список праздников Литвы (ММ-ДД)
+        const ltHolidays = [
+            '01-01', // Новый год
+            '02-16', // День восстановления государства
+            '03-11', // День восстановления независимости
+            '05-01', // День труда
+            '06-24', // Йонинес
+            '07-06', // День государства (коронация Миндаугаса)
+            '08-15', // Жолине (Успение)
+            '11-01', // День всех святых
+            '11-02', // День поминовения усопших
+            '12-24', // Сочельник
+            '12-25', // Рождество
+            '12-26'  // Второй день Рождества
+        ];
 
-        // Функция для генерации списка времени с шагом 30 мин
+        // Функция расчета Пасхи (для Литвы важна Пасха и следующий за ней понедельник)
+        function getEaster(year) {
+            const f = Math.floor,
+                G = year % 19,
+                C = f(year / 100),
+                H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30,
+                I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11)),
+                J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7,
+                L = I - J,
+                month = 3 + f((L + 40) / 44),
+                day = L + 28 - 31 * f(month / 4);
+            return { month: month - 1, day: day };
+        }
+
+        let currentYear, currentMonth;
+
+        function isHoliday(date) {
+            const m = (date.getMonth() + 1).toString().padStart(2, '0');
+            const d = date.getDate().toString().padStart(2, '0');
+            const mmdd = `${m}-${d}`;
+            
+            // Проверка фиксированных дат
+            if (ltHolidays.includes(mmdd)) return true;
+            
+            // Проверка выходных (Сб и Вс)
+            if (date.getDay() === 0 || date.getDay() === 6) return true;
+
+            // Проверка Пасхи и пасхального понедельника
+            const easter = getEaster(date.getFullYear());
+            const easterDate = new Date(date.getFullYear(), easter.month, easter.day);
+            const easterMonday = new Date(date.getFullYear(), easter.month, easter.day + 1);
+            
+            if (date.toDateString() === easterDate.toDateString() || 
+                date.toDateString() === easterMonday.toDateString()) return true;
+
+            return false;
+        }
+
         function generateTimeOptions(selected) {
             let options = '<option value="">--:--</option>';
             for (let h = 0; h < 24; h++) {
@@ -79,26 +142,39 @@
 
         window.onload = function() {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
+            initTable(now.getFullYear(), now.getMonth());
+        };
+
+        function changeDate(val) {
+            if (!val) return;
+            const [y, m] = val.split('-').map(Number);
+            initTable(y, m - 1);
+        }
+
+        function initTable(year, month) {
+            currentYear = year;
+            currentMonth = month;
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-
             document.getElementById('month-title').innerText = months[month].toUpperCase();
+            document.getElementById('month-picker').value = `${year}-${(month + 1).toString().padStart(2, '0')}`;
 
-            const saved = JSON.parse(localStorage.getItem('worker_log_v2') || '{}');
-            document.getElementById('r_n').value = saved.r_n || 10;
-            document.getElementById('r_o').value = saved.r_o || 15;
+            const storageKey = `worker_log_${year}_${month}`;
+            const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            const settings = JSON.parse(localStorage.getItem('worker_settings') || '{"r_n":10, "r_o":15}');
+            document.getElementById('r_n').value = settings.r_n;
+            document.getElementById('r_o').value = settings.r_o;
 
             const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const date = new Date(year, month, d);
                 const dayName = weekdays[date.getDay()];
-                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const holiday = isHoliday(date);
                 const rowData = saved.rows ? saved.rows[d-1] : null;
 
                 const tr = document.createElement('tr');
-                if (isWeekend) tr.className = 'weekend';
+                if (holiday) tr.className = 'holiday';
 
                 tr.innerHTML = `
                     <td class="font-bold text-xs">${d}<br><span class="opacity-40 font-normal">${dayName}</span></td>
@@ -110,46 +186,38 @@
                 tbody.appendChild(tr);
             }
             calc();
-        };
+        }
 
         function calc() {
             let tH = 0, tM = 0;
             const rn = parseFloat(document.getElementById('r_n').value) || 0;
             const ro = parseFloat(document.getElementById('r_o').value) || 0;
             const rows = [];
-
             document.querySelectorAll('#table-body tr').forEach(tr => {
                 const selects = tr.querySelectorAll('select');
                 const numInput = tr.querySelector('input[type="number"]');
-                
                 const s = selects[0].value, e = selects[1].value, l = parseFloat(numInput.value) || 0;
                 rows.push({s, e, l});
-
                 const rowM = tr.querySelector('#row-m');
-
                 if (s && e) {
                     const [sh, sm] = s.split(':').map(Number);
                     const [eh, em] = e.split(':').map(Number);
-
                     let diff = (eh + em/60) - (sh + sm/60);
                     if (diff < 0) diff += 24;
-
                     let net = Math.max(0, diff - l/60);
                     let m = net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
-
                     rowM.innerText = Math.round(m);
                     rowM.className = "font-black text-blue-600 text-sm";
-                    tH += net; 
-                    tM += m;
+                    tH += net; tM += m;
                 } else {
                     rowM.innerText = "0";
                     rowM.className = "font-black text-slate-200 text-xs";
                 }
             });
-
             document.getElementById('total_h').innerText = tH.toFixed(1);
             document.getElementById('total_m').innerText = tM.toFixed(2).replace('.', ',') + ' €';
-            localStorage.setItem('worker_log_v2', JSON.stringify({r_n: rn, r_o: ro, rows}));
+            localStorage.setItem(`worker_log_${currentYear}_${currentMonth}`, JSON.stringify({rows}));
+            localStorage.setItem('worker_settings', JSON.stringify({r_n: rn, r_o: ro}));
         }
     </script>
 </body>
