@@ -10,11 +10,15 @@
         .ios-table { width: 100%; border-collapse: separate; border-spacing: 0; background: white; border-radius: 14px; overflow: hidden; }
         th { background: #f8fafc; font-size: 10px; text-transform: uppercase; color: #64748b; padding: 12px 4px; border-bottom: 1px solid #e5e7eb; }
         td { padding: 8px 2px; border-bottom: 1px solid #f2f2f7; text-align: center; }
-        input[type="time"] { 
+        
+        /* Стили для новых выпадающих списков */
+        .time-select { 
             background: #f1f5f9; border-radius: 8px; padding: 8px 2px; 
             font-weight: 800; color: #1e293b; border: none; font-size: 14px;
             -webkit-appearance: none; width: 80px; text-align: center;
+            text-align-last: center; cursor: pointer;
         }
+
         input[type="number"] { background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-weight: 700; }
         tr.weekend { background-color: #fff5f5; }
         tr.weekend td:first-child { color: #ef4444; }
@@ -24,7 +28,7 @@
 <body class="font-sans antialiased text-slate-900">
 
     <div class="max-w-xl mx-auto min-h-screen flex flex-col">
-        
+
         <header class="p-6 pb-2">
             <h1 class="text-3xl font-black tracking-tight text-slate-800" id="month-title">ГРАФИК</h1>
             <div class="flex gap-4 mt-4 bg-white p-4 rounded-2xl shadow-sm border">
@@ -61,12 +65,24 @@
         const weekdays = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
         const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
+        // Функция для генерации списка времени с шагом 30 мин
+        function generateTimeOptions(selected) {
+            let options = '<option value="">--:--</option>';
+            for (let h = 0; h < 24; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    options += `<option value="${time}" ${time === selected ? 'selected' : ''}>${time}</option>`;
+                }
+            }
+            return options;
+        }
+
         window.onload = function() {
             const now = new Date();
             const year = now.getFullYear();
             const month = now.getMonth();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
+
             document.getElementById('month-title').innerText = months[month].toUpperCase();
 
             const saved = JSON.parse(localStorage.getItem('worker_log_v2') || '{}');
@@ -83,11 +99,11 @@
 
                 const tr = document.createElement('tr');
                 if (isWeekend) tr.className = 'weekend';
-                
+
                 tr.innerHTML = `
                     <td class="font-bold text-xs">${d}<br><span class="opacity-40 font-normal">${dayName}</span></td>
-                    <td><input type="time" step="1800" value="${rowData ? rowData.s : ''}" oninput="calc()"></td>
-                    <td><input type="time" step="1800" value="${rowData ? rowData.e : ''}" oninput="calc()"></td>
+                    <td><select class="time-select" oninput="calc()">${generateTimeOptions(rowData ? rowData.s : '')}</select></td>
+                    <td><select class="time-select" oninput="calc()">${generateTimeOptions(rowData ? rowData.e : '')}</select></td>
                     <td><input type="number" value="${rowData ? rowData.l : 0}" class="w-10 text-center text-sm py-1" oninput="calc()"></td>
                     <td id="row-m" class="font-black text-slate-300 text-xs tracking-tighter">0</td>
                 `;
@@ -103,8 +119,10 @@
             const rows = [];
 
             document.querySelectorAll('#table-body tr').forEach(tr => {
-                const i = tr.querySelectorAll('input');
-                const s = i[0].value, e = i[1].value, l = parseFloat(i[2].value) || 0;
+                const selects = tr.querySelectorAll('select');
+                const numInput = tr.querySelector('input[type="number"]');
+                
+                const s = selects[0].value, e = selects[1].value, l = parseFloat(numInput.value) || 0;
                 rows.push({s, e, l});
 
                 const rowM = tr.querySelector('#row-m');
@@ -112,13 +130,13 @@
                 if (s && e) {
                     const [sh, sm] = s.split(':').map(Number);
                     const [eh, em] = e.split(':').map(Number);
-                    
+
                     let diff = (eh + em/60) - (sh + sm/60);
                     if (diff < 0) diff += 24;
-                    
+
                     let net = Math.max(0, diff - l/60);
                     let m = net > 8 ? (8 * rn + (net - 8) * ro) : (net * rn);
-                    
+
                     rowM.innerText = Math.round(m);
                     rowM.className = "font-black text-blue-600 text-sm";
                     tH += net; 
